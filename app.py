@@ -8,7 +8,13 @@ import google.generativeai as genai
 import streamlit as st # 确保这行也在
 
 # === 在这里加两行测谎代码 ===
-st.write(f"当前驱动版本: {genai.__version__}") 
+st.info("正在查询可用模型...")
+try:
+    for m in genai.list_models():
+        if 'generateContent' in m.supported_generation_methods:
+            st.write(f"✅ 可用: {m.name}")
+except Exception as e:
+    st.error(f"查询失败，可能是 API 未启用: {e}")
 # 如果显示低于 0.8.0，那就是服务器在骗人！
 # ================= 配置区 =================
 # 获取 Key
