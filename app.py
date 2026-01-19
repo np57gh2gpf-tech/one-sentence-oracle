@@ -9,7 +9,7 @@ import random
 API_KEY = st.secrets.get("GEMINI_API_KEY", None)
 
 # ================= 2. 页面样式 (保持神秘高级感) =================
-st.set_page_config(page_title="天机·深层推演", page_icon="🌒", layout="centered")
+st.set_page_config(page_title="天机·一句顶一万句", page_icon="🌒", layout="centered")
 
 st.markdown("""
 <style>
