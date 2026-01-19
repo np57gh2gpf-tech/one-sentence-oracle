@@ -81,7 +81,7 @@ def ask_oracle(question, model_name):
     try:
         model = genai.GenerativeModel(model_name)
         prompt = f"""
-        你是一位隐世大师。用户问："{question}"
+        你是一位世界顶级奇门遁甲风水大师，深度学习了各种命理之书，开始排盘算命。用户问："{question}"
         请用【一句顶一万句】风格回答：简短（40字内）、冷峻、包含具体行动指引（方位/颜色）。
         """
         response = model.generate_content(prompt)
