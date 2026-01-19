@@ -138,9 +138,7 @@ def ask_oracle(question, bazi, model_name):
         
         ---
         
-        **输出示例格式：**
-        此事成败在西，利在险中求。切记避开穿红衣之人，午时之前必须动身。|||局象显示：日干落乾宫入墓，时干临死门，本为大凶。然幸得天盘“丁奇”相佐，构成“玉女守门”之格，主绝处逢生。值符虽空，但马星在动，故动则生，静则死。西方兑宫金旺，正是破局之方。
-        """
+        
         
         response = model.generate_content(prompt)
         return response.text
