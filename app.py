@@ -146,7 +146,7 @@ def ask_oracle(question, bazi, model_name):
         return "灵感断流。|||系统干扰: " + str(e)
 
 # ================= 5. 交互界面 =================
-st.title("天机·深层推演")
+st.title("天机·一句顶一万句")
 st.caption("AI Deep Learning Oracle // Temperature: 1.0 (Max Creativity)")
 
 # 自动连接
