@@ -3,7 +3,13 @@ import lunar_python
 import google.generativeai as genai
 from datetime import datetime
 import time
+# ... import 语句 ...
+import google.generativeai as genai
+import streamlit as st # 确保这行也在
 
+# === 在这里加两行测谎代码 ===
+st.write(f"当前驱动版本: {genai.__version__}") 
+# 如果显示低于 0.8.0，那就是服务器在骗人！
 # ================= 配置区 =================
 # 获取 Key
 API_KEY = st.secrets.get("GEMINI_API_KEY", None)
