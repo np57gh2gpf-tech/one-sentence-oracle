@@ -1,4 +1,3 @@
 streamlit
-sxtwl
 lunar_python
-google-generativeai
+google-generativeai>=0.8.0
