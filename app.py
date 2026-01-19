@@ -136,8 +136,10 @@ def ask_oracle(question, bazi, model_name):
         3. 解释为什么得出上面的结论。例如：“值符坐宫落空，故此事必虚。”，“白虎猖狂，且见杜门，主隐忍待发。”
         4. 让外行看不懂但觉得极度厉害。
         
+        **输出示例格式：**
+        |||局象显示：
+        """
         ---
-        
         
         
         response = model.generate_content(prompt)
