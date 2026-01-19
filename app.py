@@ -47,7 +47,7 @@ def ask_ai_oracle(question, bazi):
     
     try:
         # 使用更通用的模型名称
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         prompt = f"""
         你是一位精通奇门遁甲的大师。
         用户提问："{question}"
