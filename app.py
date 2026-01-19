@@ -4,10 +4,9 @@ import random
 import time
 import os
 import google.generativeai as genai
+from datetime import datetime  # 修复点：引入标准时间库
 
 # ================= 配置区 =================
-# 这里尝试从 Streamlit Secrets 获取 API Key
-# 如果没有 Key，自动切换到 "演示模式"
 API_KEY = st.secrets.get("GEMINI_API_KEY", None)
 
 if API_KEY:
@@ -21,18 +20,13 @@ st.set_page_config(page_title="一句顶一万句", page_icon="🔮", layout="ce
 
 st.markdown("""
 <style>
-    /* 极致黑客风 */
     .stApp {background-color: #000000; color: #e0e0e0;}
-    
-    /* 输入框样式 */
     .stTextInput > div > div > input {
         color: #00ff00; 
         background-color: #0d1117; 
         border: 1px solid #30363d;
         font-family: 'Courier New';
     }
-    
-    /* 按钮样式 */
     .stButton > button {
         width: 100%;
         background-color: #21262d;
@@ -40,12 +34,6 @@ st.markdown("""
         border: 1px solid #30363d;
         font-family: 'Courier New';
     }
-    .stButton > button:hover {
-        border-color: #8b949e;
-        color: #58a6ff;
-    }
-
-    /* 结果大字 */
     .oracle-text {
         font-family: 'Songti SC', 'SimSun', serif; 
         font-size: 28px; 
@@ -58,8 +46,6 @@ st.markdown("""
         line-height: 1.5;
         text-shadow: 0 0 10px #ffffff55;
     }
-    
-    /* 底部小字 */
     .footer {text-align: center; color: #444; font-size: 12px; margin-top: 50px;}
 </style>
 """, unsafe_allow_html=True)
@@ -68,7 +54,8 @@ st.markdown("""
 
 def get_bazi_info():
     """获取当前时空的能量坐标（八字）"""
-    solar = lunar_python.Solar.fromDate(time.localtime())
+    # 修复点：这里把 time.localtime() 改为了 datetime.now()
+    solar = lunar_python.Solar.fromDate(datetime.now())
     lunar = solar.getLunar()
     bazi = lunar.getBaZi()
     return f"{bazi[0]}年 {bazi[1]}月 {bazi[2]}日 {bazi[3]}时"
@@ -76,7 +63,6 @@ def get_bazi_info():
 def ask_ai_oracle(question, bazi):
     """真·AI 算命逻辑"""
     if not AI_MODE:
-        # 如果没有 API Key，使用预设的随机库（演示用）
         mock_answers = [
             "局势如雾，但东南方有微光。此时静默胜过行动，三日后自有转机。",
             "火入乾宫，看似危机四伏，实则只需破釜沉舟。除了你自己，无人能阻你。",
@@ -84,7 +70,7 @@ def ask_ai_oracle(question, bazi):
             "利在这一刻。不要犹豫，那个看似疯狂的决定，才是唯一的正解。",
             "玄武临门，需防口舌之争。闭嘴做事，这就是你赢过他们的唯一方式。"
         ]
-        time.sleep(1.5) # 假装在思考
+        time.sleep(1.5)
         return random.choice(mock_answers)
     
     try:
@@ -119,7 +105,6 @@ if st.button("断"):
         progress_text = st.empty()
         bar = st.progress(0)
         
-        # 模拟赛博算命过程
         for i in range(100):
             time.sleep(0.01)
             bar.progress(i + 1)
@@ -130,15 +115,13 @@ if st.button("断"):
         bar.empty()
         progress_text.empty()
         
-        # 获取结果
-        bazi = get_bazi_info()
-        answer = ask_ai_oracle(question, bazi)
-        
-        # 展示结果
-        st.markdown(f'<div class="oracle-text">{answer}</div>', unsafe_allow_html=True)
-        
-        # 底部数据展示（装X用）
-        with st.expander("查看底层数据流"):
-            st.code(f"Time_Coordinate: {bazi}\nModel: Gemini-Pro-Quantized\nLatency: 24ms", language="yaml")
+        try:
+            bazi = get_bazi_info()
+            answer = ask_ai_oracle(question, bazi)
+            st.markdown(f'<div class="oracle-text">{answer}</div>', unsafe_allow_html=True)
+            with st.expander("查看底层数据流"):
+                st.code(f"Time_Coordinate: {bazi}\nModel: Gemini-Pro\nStatus: Online", language="yaml")
+        except Exception as e:
+            st.error(f"运行时错误: {e}")
 
 st.markdown('<div class="footer">Powered by Gemini & 奇门遁甲算法</div>', unsafe_allow_html=True)
