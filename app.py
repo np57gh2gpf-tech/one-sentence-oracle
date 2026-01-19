@@ -5,77 +5,70 @@ from datetime import datetime
 import time
 import random
 
-# ================= 1. 基础配置 (技术基石，不动) =================
+# ================= 1. 基础配置 =================
 API_KEY = st.secrets.get("GEMINI_API_KEY", None)
 
-# ================= 2. 页面样式 (宗师级审美) =================
-st.set_page_config(page_title="天机·一言断", page_icon="☯️", layout="centered")
+# ================= 2. 页面样式 (保持神秘高级感) =================
+st.set_page_config(page_title="天机·深层推演", page_icon="🌒", layout="centered")
 
 st.markdown("""
 <style>
-    /* 全局黑底 */
-    .stApp {background-color: #0e1117; color: #c9d1d9;}
+    .stApp {background-color: #080808; color: #ccc;}
     
-    /* 输入框：黑底金字，更显贵气 */
+    /* 输入框：极简黑金 */
     .stTextInput > div > div > input {
-        color: #e6c9a8; 
-        background-color: #1a1d24; 
-        border: 1px solid #3d342b; 
+        color: #d4af37; 
+        background-color: #121212; 
+        border: 1px solid #333; 
         font-family: 'Courier New';
     }
     
-    /* 按钮：深邃灰 */
     .stButton > button {
-        width: 100%; 
-        background-color: #2b2d31; 
-        color: #e6c9a8; 
-        border: 1px solid #3d342b;
+        width: 100%; background-color: #1e1e1e; color: #888; border: 1px solid #333;
+        transition: all 0.3s;
+    }
+    .stButton > button:hover {
+        border-color: #d4af37; color: #d4af37;
     }
     
-    /* 核心判词 (大字)：如圣旨般醒目 */
+    /* 结果容器：不再受限于边框，更像虚空浮现的文字 */
     .oracle-main {
         font-family: 'Songti SC', 'SimSun', serif; 
-        font-size: 30px; 
-        color: #e6c9a8; /* 鎏金色 */
+        font-size: 32px; 
+        color: #e6c9a8; 
         text-align: center; 
-        padding: 30px 20px; 
-        border-top: 2px solid #3d342b;
-        border-bottom: 1px dashed #3d342b;
-        background-color: #16181c; 
+        padding: 40px 10px; 
         margin-top: 20px;
-        line-height: 1.5;
+        line-height: 1.4;
         font-weight: bold;
-        text-shadow: 0 0 10px rgba(230, 201, 168, 0.2);
+        text-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
     }
     
-    /* 玄学注解 (小字)：像古籍注疏，密密麻麻 */
     .oracle-note {
         font-family: 'KaiTi', '楷体', serif;
-        font-size: 14px;
-        color: #8b949e; /* 沉稳灰 */
-        text-align: justify; /* 两端对齐，像书卷 */
-        padding: 15px 30px;
-        background-color: #16181c;
-        border-bottom: 2px solid #3d342b;
+        font-size: 15px;
+        color: #555; 
+        text-align: justify; 
+        padding: 20px;
+        border-top: 1px solid #222;
+        margin-top: 10px;
         line-height: 1.8;
-        opacity: 0.9;
     }
     
-    .loading-text { font-family: 'Courier New'; font-size: 12px; color: #555; text-align: center;}
+    .loading-text { font-family: 'Courier New'; font-size: 12px; color: #444; text-align: center; margin-top:5px;}
 </style>
 """, unsafe_allow_html=True)
 
-# ================= 3. 智能模型连接 (保持自动寻路，确保能通) =================
+# ================= 3. 智能模型连接 =================
 def find_working_model():
     if not API_KEY: return None, "请配置 API Key"
     genai.configure(api_key=API_KEY)
     
-    # 优先用文采好的 Pro，体验版 Flash 兜底
+    # 优先使用 Pro，因为它的逻辑推理能力强，生成的语言更丰富多变
     priority_list = [
         "gemini-1.5-pro", 
         "gemini-2.0-flash-exp",
-        "gemini-1.5-flash",
-        "gemini-2.0-flash"
+        "gemini-1.5-flash"
     ]
     
     for model_name in priority_list:
@@ -85,7 +78,7 @@ def find_working_model():
             return model_name, None
         except: continue
             
-    # 兜底扫描
+    # 兜底
     try:
         for m in genai.list_models():
             if 'generateContent' in m.supported_generation_methods:
@@ -96,9 +89,9 @@ def find_working_model():
                 except: continue
     except Exception as e:
         return None, str(e)
-    return None, "未找到可用通道"
+    return None, "未找到可用模型"
 
-# ================= 4. 核心业务 (升级版) =================
+# ================= 4. 核心业务 =================
 def get_bazi():
     now = datetime.now()
     solar = lunar_python.Solar.fromYmdHms(now.year, now.month, now.day, now.hour, now.minute, now.second)
@@ -111,102 +104,101 @@ def ask_oracle(question, bazi, model_name):
         model = genai.GenerativeModel(model_name)
         
         # ==========================================
-        # 👑 究极 Prompt：双层输出结构
+        # 👑 自由意志 Prompt (去模板化)
         # ==========================================
         prompt = f"""
-        你不仅是AI，你是【奇门遁甲第57代掌门人】。你面前是一张刚排好的奇门盘，你需要根据时空八字为用户解惑。
+        【指令】：你此刻是《奇门遁甲》与《易经》的集大成者。
         
-        【用户提问】: "{question}"
-        【时空八字】: {bazi}
+        【输入信息】
+        用户困惑："{question}"
+        当前时空：{bazi}
         
-        请严格按照以下【两个部分】的格式输出，中间用 "|||" 分隔。
+        【深度思考任务】
+        1. 请根据当前的“八字”，在你的庞大知识库中检索对应的“时空能量场”。不要瞎编，要基于五行生克原理。
+        2. 将“用户的困惑”放入这个能量场中，看是“生”还是“克”。
+        3. 就像一位真正的大师那样，根据这一瞬间的灵感，直接说出结论。
         
-        ---
+        【输出规则 - 绝对禁止套用模板】
+        请输出两段话，中间用 "|||" 分隔。
         
-        **第一部分：天机直断 (给用户的最终答案)**
-        要求：
-        1. 40字以内。
-        2. 风格：铁口直断，冷峻，不留情面。禁止模棱两可。
-        3. **核心**：先给结论，然后紧接一句【最需要警惕】或【必须立刻去做】的事。
+        **第一段（给用户看的结果）：**
+        - 不要用“根据卦象显示”这种废话开头。直接说事！
+        - 语言风格要多变，可以是冷峻的、讽刺的、温暖的、或者神秘的，完全取决于当下的卦象是吉是凶。
+        - **必须**包含一个只有在这个时间点才会出现的“独家建议”（比如具体的方位、颜色、或者一个奇怪的物品）。
+        - 40字以内。
         
-        **第二部分：象数理推演 (给用户看的“天书”解释)**
-        要求：
-        1. 100字左右。
-        2. **必须专业**：使用奇门术语（如：九星、八门、八神、格局）。
-        3. 解释为什么得出上面的结论。例如：“值符坐宫落空，故此事必虚。”，“白虎猖狂，且见杜门，主隐忍待发。”
-        4. 让外行看不懂但觉得极度厉害。
+        **第二段（底层的玄学逻辑）：**
+        - 用最专业的术语解释你为什么这么判。
+        - 解释这一瞬间“天干地支”是如何撞击出这个结果的。
+        - 这部分是为了展示你深不可测的逻辑链条。
         
-        **输出示例格式：**
-        |||局象显示：
+        现在，释放你的深度学习能力，给出唯一的答案：
         """
-        ---
         
+        # 🔥 关键修改：temperature=1.0 
+        # 这是一个控制“创造力”的参数。0是死板，1是极度奔放。
+        # 设置为 1.0 保证每次生成的词汇、句式都完全不同，拒绝重复。
+        config = genai.types.GenerationConfig(temperature=1.0)
         
-        response = model.generate_content(prompt)
+        response = model.generate_content(prompt, generation_config=config)
         return response.text
     except Exception as e:
-        return "天机混沌，干扰过大。|||系统连接波动，请稍后诚心再试。"
+        return "灵感断流。|||系统干扰: " + str(e)
 
 # ================= 5. 交互界面 =================
-st.title("☯️ 天机·一言断")
-st.caption("Powered by Gemini Context | 奇门局象推演系统")
+st.title("天机·深层推演")
+st.caption("AI Deep Learning Oracle // Temperature: 1.0 (Max Creativity)")
 
 # 自动连接
 if 'working_model' not in st.session_state:
-    with st.spinner("正在校准真太阳时，沟通天地..."):
+    with st.spinner("正在链接神经网络与时空场..."):
         model_name, error = find_working_model()
         if model_name:
             st.session_state['working_model'] = model_name
         else:
-            st.error(f"⚠️ 灵力阻断: {error}")
+            st.error(f"连接失败: {error}")
 
-question = st.text_input("", placeholder="凡事只问一次，心诚则灵...")
+question = st.text_input("", placeholder="在此输入，AI 将为你进行一次独一无二的推演...")
 
-if st.button("🔴 起 局 排 盘"):
+if st.button("⚜️ 开 启 推 演"):
     if not question:
-        st.warning("无问则无卦。")
+        st.warning("空即是色，但此时需要输入问题。")
     elif 'working_model' in st.session_state:
         
-        # === 沉浸式排盘动画 ===
-        info_placeholder = st.empty()
+        # 极简加载，不抢戏
+        progress_text = st.empty()
         bar = st.progress(0)
         
-        phases = [
-            "正在定地盘九宫...", 
-            "飞布天盘九星 (天蓬/天任/天冲)...", 
-            "推演人盘八门 (休/生/伤/杜)...", 
-            "召唤神盘八神 (值符/腾蛇/太阴)...", 
-            "分析十干克应...", 
-            "捕捉时空外应..."
+        # 随机的加载语，也不重复
+        loading_msgs = [
+            "正在检索五行生克...", "神经网络拟合中...", "捕捉时空奇异点...", 
+            "解析十干深层克应...", "生成唯一解..."
         ]
         
-        for i, phase in enumerate(phases):
-            info_placeholder.markdown(f"<div class='loading-text'>{phase}</div>", unsafe_allow_html=True)
-            time.sleep(random.uniform(0.5, 0.8)) # 随机延迟，模拟计算
-            bar.progress(int((i + 1) / len(phases) * 100))
+        for i in range(100):
+            if i % 20 == 0:
+                progress_text.text(random.choice(loading_msgs))
+            time.sleep(0.01) 
+            bar.progress(i + 1)
             
         bar.empty()
-        info_placeholder.empty()
+        progress_text.empty()
         
-        # === 获取结果 ===
+        # 获取结果
         bazi = get_bazi()
         full_response = ask_oracle(question, bazi, st.session_state['working_model'])
         
-        # === 核心：分割结果并渲染 ===
         if "|||" in full_response:
             main_text, note_text = full_response.split("|||", 1)
         else:
             main_text = full_response
-            note_text = "局象模糊，未能生成详细批注。"
+            note_text = "玄机暗藏，不可言说。"
             
-        # 1. 显示大字判词
+        # 1. 大字结果：不再有框，像浮在屏幕上
         st.markdown(f'<div class="oracle-main">{main_text}</div>', unsafe_allow_html=True)
         
-        # 2. 显示小字注解 (玄学解释)
-        st.markdown(f'<div class="oracle-note"><b>【局象推演】</b><br>{note_text}</div>', unsafe_allow_html=True)
-        
-        # 3. 底部数据流
-        st.markdown(f"<div style='text-align:center; color:#333; font-size:10px; margin-top:10px;'>Time: {bazi} | Model: {st.session_state['working_model']}</div>", unsafe_allow_html=True)
+        # 2. 小字逻辑：黑底灰字，极其专业
+        st.markdown(f'<div class="oracle-note"><b>✦ 深度推演逻辑：</b><br>{note_text}</div>', unsafe_allow_html=True)
         
     else:
-        st.error("通道未建立，请刷新重试。")
+        st.error("通道未建立。")
