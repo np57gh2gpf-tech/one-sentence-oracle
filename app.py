@@ -1,83 +1,89 @@
 import streamlit as st
-import json
 import urllib.request
-import urllib.error
+import json
+import ssl
+import os
 
-# --- 1. 基础配置 ---
-st.set_page_config(page_title="皮皮鹦鹉", page_icon="🦜")
+st.set_page_config(page_title="API 诊断室", page_icon="👨‍⚕️")
 
-# 你的 Key (我在截图里看到的那个)
+st.title("👨‍⚕️ API 连接诊断室")
+st.write("正在检查你的 API Key 和网络连接，请稍候...")
+
+# 你的 Key
 API_KEY = "AIzaSyDbE2a89o6fshlklYKso-0uvBKoL9e51kk"
 
-# --- 2. 核心功能: 极简连接 AI ---
-def talk_to_parrot(text):
-    # 這是谷歌 AI 的接口地址
+# 定义一个检查函数
+def check_connection(proxy=None):
+    # 如果指定了代理，临时设置一下
+    if proxy:
+        os.environ["http_proxy"] = proxy
+        os.environ["https_proxy"] = proxy
+    else:
+        #如果不指定，清除系统变量干扰（保持纯净）
+        os.environ.pop("http_proxy", None)
+        os.environ.pop("https_proxy", None)
+
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
-    
-    # 鹦鹉的设定
-    prompt = {
-        "contents": [{
-            "parts": [{
-                "text": f"你是一只3岁的鹦鹉叫皮皮。请用简短、可爱、重复的语气回答小朋友的话。每句话结尾加'呱！'。小朋友说：{text}"
-            }]
-        }]
-    }
+    data = json.dumps({"contents": [{"parts": [{"text": "Hello"}]}]}).encode('utf-8')
     
     try:
-        data = json.dumps(prompt).encode('utf-8')
-        # 创建请求
+        # 忽略证书验证 (防止 SSL 报错)
+        context = ssl._create_unverified_context()
         req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
         
-        # 发送! (这里需要你的电脑能访问谷歌)
-        with urllib.request.urlopen(req, timeout=10) as response:
-            result = json.loads(response.read().decode('utf-8'))
-            return result['candidates'][0]['content']['parts'][0]['text']
+        # 发送请求 (5秒超时)
+        with urllib.request.urlopen(req, context=context, timeout=5) as response:
+            return "SUCCESS", response.code
             
     except urllib.error.HTTPError as e:
-        if e.code == 403 or e.code == 400:
-            return "呱！请去网页上搜索 'Generative Language API' 并点击启用！"
-        return f"呱！服务器拒绝了我 (错误码 {e.code})"
+        return "KEY_ERROR", e.code
+    except urllib.error.URLError as e:
+        return "NETWORK_ERROR", str(e.reason)
     except Exception as e:
-        return "呱！网络不通... (请确保你的梯子/VPN是开着的)"
+        return "UNKNOWN_ERROR", str(e)
 
-# --- 3. 界面设计 ---
-st.markdown("""
-<style>
-    .stApp { background-color: #fdfbf7; }
-    .parrot { font-size: 80px; text-align: center; display: block; animation: float 3s infinite; }
-    @keyframes float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
-    .chat-bubble { background: white; padding: 15px; border-radius: 15px; margin-top: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-</style>
-""", unsafe_allow_html=True)
+# --- 开始自动诊断 ---
 
-# --- 4. 交互区域 ---
-st.markdown("<div class='parrot'>🦜</div>", unsafe_allow_html=True)
-st.subheader("我是皮皮，跟我说话吧！")
+# 1. 第一轮：直接连接
+with st.spinner("正在尝试直接连接 Google..."):
+    status, msg = check_connection()
 
-# 简单的输入框
-user_input = st.chat_input("输入你想说的话...")
+if status == "SUCCESS":
+    st.success("✅ **直接连接成功！**")
+    st.write("结论：你的网络环境非常好，Key 也是对的。之前的代码跑不通可能是代码写复杂了。")
+    st.balloons()
 
-if user_input:
-    # 1. 显示你的话
-    st.write(f"👤 **你**: {user_input}")
+elif status == "KEY_ERROR":
+    st.error(f"❌ **网络通了，但 Key 错了** (错误码: {msg})")
+    st.write("结论：你的 Python 成功连上了谷歌，但是谷歌拒绝了你的密码。")
+    st.warning("建议：请去 Google AI Studio 重新生成一个 Key。")
+
+elif status == "NETWORK_ERROR":
+    st.error(f"❌ **直接连接失败** ({msg})")
+    st.write("正在尝试自动修复（测试常用代理端口 7890/10809）...")
     
-    # 2. 鹦鹉思考
-    with st.spinner("皮皮正在思考..."):
-        reply = talk_to_parrot(user_input)
+    # 2. 第二轮：尝试自动挂代理
+    proxies_to_try = ["http://127.0.0.1:7890", "http://127.0.0.1:10809", "http://127.0.0.1:1080"]
+    success_proxy = None
     
-    # 3. 显示鹦鹉的话
-    st.markdown(f"<div class='chat-bubble'>🦜 **皮皮**: {reply}</div>", unsafe_allow_html=True)
+    for p in proxies_to_try:
+        with st.spinner(f"正在尝试代理 {p} ..."):
+            s, m = check_connection(proxy=p)
+            if s == "SUCCESS":
+                success_proxy = p
+                break
     
-    # 4. 自动朗读 (利用浏览器能力)
-    # 这里的代码会让你的浏览器把字读出来，不用装任何库
-    safe_reply = reply.replace("\n", "").replace('"', '')
-    st.components.v1.html(f"""
-    <script>
-        window.speechSynthesis.cancel();
-        var msg = new SpeechSynthesisUtterance("{safe_reply}");
-        msg.lang = "zh-CN";
-        msg.rate = 1.3; 
-        msg.pitch = 1.5;
-        window.speechSynthesis.speak(msg);
-    </script>
-    """, height=0)
+    if success_proxy:
+        st.success(f"✅ **修复成功！** 发现你的有效代理端口是：`{success_proxy}`")
+        st.markdown(f"""
+        ### 💡 怎么解决？
+        请在你之后的代码里，**必须**加上这两行代码才能跑通：
+        ```python
+        import os
+        os.environ["http_proxy"] = "{success_proxy}"
+        os.environ["https_proxy"] = "{success_proxy}"
+        ```
+        """)
+    else:
+        st.error("💀 **彻底失败**：试了所有常用端口都连不上。")
+        st.write("原因：你的 VPN 可能没有开启，或者不是这几个常见端口。")
