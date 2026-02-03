@@ -2,84 +2,104 @@ import streamlit as st
 import json
 import urllib.request
 import urllib.error
-import ssl
 
-st.set_page_config(page_title="Key 验尸官", page_icon="🕵️‍♂️")
+# --- 1. 基础配置 ---
+st.set_page_config(page_title="皮皮鹦鹉", page_icon="🦜")
 
-# 你的 Key (这是你截图里的那个)
-TARGET_KEY = "AIzaSyDbE2a89o6fshlklYKso-0uvBKoL9e51kk"
+# 你的 Key (验证通过的那个)
+API_KEY = "AIzaSyDbE2a89o6fshlklYKso-0uvBKoL9e51kk"
 
-st.title("🕵️‍♂️ API Key 验尸报告")
-st.write(f"正在测试 Key: `{TARGET_KEY[:5]}...{TARGET_KEY[-5:]}`")
-
-def test_key():
-    # 测试 1: 基础连接测试 (列出可用模型)
-    # 这个接口最灵敏，只要 Key 是活的，权限开了，它就会返回 200
-    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={TARGET_KEY}"
+# --- 2. 核心功能: 连接 Gemini Pro ---
+def talk_to_parrot(user_text):
+    # 🔴 关键修改：听从诊断建议，使用 gemini-pro 模型
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={API_KEY}"
+    
+    # 鹦鹉的人设 (Gemini Pro 最好把人设放在第一句)
+    system_text = "你现在是一只3岁的宠物鹦鹉叫皮皮。规则：1.回复要简短(20字以内)可爱。2.喜欢重复词语(如'好吃好吃')。3.每句话结尾必须加'呱！'。4.如果不懂就说要吃瓜子。"
+    
+    # 构造请求数据
+    payload = {
+        "contents": [
+            # 伪造第一轮对话来确立人设（这是 Gemini Pro 最稳的写法）
+            {"role": "user", "parts": [{"text": system_text}]}, 
+            {"role": "model", "parts": [{"text": "收到！我是皮皮！好吃好吃！呱！"}]},
+            # 用户的真实问题
+            {"role": "user", "parts": [{"text": user_text}]}
+        ]
+    }
     
     try:
-        # 忽略 SSL 证书验证 (排除 Mac 网络证书干扰)
-        context = ssl._create_unverified_context()
-        req = urllib.request.Request(url)
+        data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
         
-        with urllib.request.urlopen(req, context=context, timeout=10) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            return "ALIVE", data
+        # 发送请求
+        with urllib.request.urlopen(req, timeout=10) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            # 提取回答
+            return result['candidates'][0]['content']['parts'][0]['text']
             
     except urllib.error.HTTPError as e:
-        return "HTTP_ERROR", e.code
-    except urllib.error.URLError as e:
-        return "NETWORK_ERROR", e.reason
+        return f"呱！服务器报错了 (代码 {e.code})，请检查网络！"
     except Exception as e:
-        return "UNKNOWN", str(e)
+        return f"呱！脑子卡住了 ({str(e)})"
 
-# --- 开始运行测试 ---
-with st.spinner("正在进行尸检..."):
-    status, result = test_key()
-
-st.divider()
-
-if status == "ALIVE":
-    st.success("🎉 **恭喜！这个 Key 是活的！**")
-    st.balloons()
-    st.write("### 详细诊断：")
-    st.write("1. ✅ **网络没问题**：Python 成功连上了 Google。")
-    st.write("2. ✅ **Key 没问题**：Google 验证通过。")
-    st.write("3. ✅ **权限没问题**：API 服务已开启。")
+# --- 3. 界面设计 (护眼风) ---
+st.markdown("""
+<style>
+    .stApp { background-color: #fdfbf7; }
+    header { visibility: hidden; }
     
-    # 打印可用的模型，看看你的账号能用哪些
-    model_names = [m['name'] for m in result.get('models', [])]
+    .parrot-container { text-align: center; margin-top: 20px; }
+    .parrot-avatar { 
+        font-size: 100px; 
+        display: inline-block; 
+        animation: float 3s ease-in-out infinite;
+        cursor: pointer;
+    }
     
-    # 检查是否支持 gemini-1.5-flash
-    if 'models/gemini-1.5-flash' in model_names:
-        st.success("🚀 **完美！你的账号支持 gemini-1.5-flash (最新版)！**")
-        st.info("下一步：你可以放心地使用鹦鹉代码了。")
-    else:
-        st.warning("⚠️ **注意**：你的列表里没有 flash 模型。请在之后的代码里使用 `gemini-pro`。")
-
-elif status == "HTTP_ERROR":
-    st.error(f"💀 **测试失败：服务器拒绝 (错误码 {result})**")
+    @keyframes float { 0%, 100% {transform: translateY(0);} 50% {transform: translateY(-15px);} }
     
-    if result == 400:
-        st.write("❌ **诊断：Key 无效**。")
-        st.write("原因：Key 可能复制错了，或者被删除了。")
-        
-    elif result == 403:
-        st.write("🔒 **诊断：Key 是对的，但门没开！**")
-        st.write("原因：你没有在 Google Cloud Console 启用 **'Generative Language API'**。")
-        st.markdown("[👉 点击这里去开启](https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com)")
-        
-    elif result == 404:
-        st.write("❓ **诊断：找不到资源**。")
-        st.write("这种情况很少见，可能是接口地址变了。")
+    .chat-bubble {
+        background-color: white;
+        padding: 20px;
+        border-radius: 20px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        margin-top: 20px;
+        font-size: 18px;
+        color: #4e342e;
+        border: 2px solid #e0e0e0;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-elif status == "NETWORK_ERROR":
-    st.error("🔌 **测试失败：网络完全不通**")
-    st.write(f"错误信息：`{result}`")
-    st.write("💡 **原因**：你的 VPN 没开，或者 Python 没走代理。")
+# --- 4. 页面布局 ---
+st.markdown("<div class='parrot-container'><div class='parrot-avatar'>🦜</div><h2>我是皮皮，快跟我说话！</h2></div>", unsafe_allow_html=True)
+
+# --- 5. 交互区域 ---
+# 简单的聊天输入框
+user_input = st.chat_input("输入文字，皮皮会读给你听...")
+
+if user_input:
+    # 1. 显示用户输入
+    st.write(f"👤 **你**: {user_input}")
     
-    # 提供代理修复建议
-    st.warning("🚑 **急救建议**：请在侧边栏手动配置代理端口 (7890 或 10809)。")
-
-else:
-    st.error(f"💥 **未知错误**：{result}")
+    # 2. 思考中
+    with st.spinner("皮皮正在思考..."):
+        reply = talk_to_parrot(user_input)
+    
+    # 3. 显示回复
+    st.markdown(f"<div class='chat-bubble'>🦜 **皮皮**: {reply}</div>", unsafe_allow_html=True)
+    
+    # 4. 自动朗读 (浏览器原生能力，不需要任何库)
+    safe_reply = reply.replace("\n", " ").replace('"', '\"')
+    js_code = f"""
+    <script>
+        window.speechSynthesis.cancel(); // 停止之前的说话
+        var msg = new SpeechSynthesisUtterance("{safe_reply}");
+        msg.lang = "zh-CN"; // 设置中文
+        msg.rate = 1.3;     // 语速快一点，像鹦鹉
+        msg.pitch = 1.5;    // 音调高一点
+        window.speechSynthesis.speak(msg);
+    </script>
+    """
+    st.components.v1.html(js_code, height=0, width=0)
