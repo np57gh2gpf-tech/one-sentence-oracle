@@ -1,357 +1,233 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# 1. 页面基础配置
-st.set_page_config(page_title="鹦鹉AI对话", page_icon="🦜", layout="centered")
+# --- 1. 页面配置 ---
+st.set_page_config(page_title="Gemini 智能鹦鹉", page_icon="🦜", layout="centered")
 
-# 2. 注入 CSS 隐藏多余菜单，聚焦体验
+# 隐藏无关菜单
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stApp { background-color: #fceea7; }
-    /* 手机端适配优化 */
-    iframe { width: 100% !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# 3. 核心 HTML/JS 代码
-html_code = """
+# --- 2. API Key 输入区 ---
+st.title("🦜 Gemini 智能鹦鹉")
+
+# 为了安全，不要把 Key 写死在代码里，而是通过网页输入
+# 如果你自己用，也可以直接把下面的 value="" 改成 value="你的sk-xxx"
+api_key = st.text_input("AIzaSyDbE2a89o6fshlklYKso-0uvBKoL9e51kk", type="password", help="输入以 sk- 开头的谷歌 API 密钥")
+
+if not api_key:
+    st.warning("👈 请先在上方输入你的 API Key，皮皮才能变聪明哦！")
+    st.stop()  # 没有 Key 就不加载后面的代码
+
+# --- 3. 核心代码 (前端 JS 调用 Gemini) ---
+# 我们把 Python 里的 api_key 传给 JavaScript 变量
+html_code = f"""
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Parrot AI Context</title>
     <style>
-        /* --- 视觉设计 (保持童趣但更现代化) --- */
-        body {
-            font-family: "Microsoft YaHei", "Comic Sans MS", sans-serif;
+        body {{
+            font-family: "Microsoft YaHei", sans-serif;
             background-color: #fceea7;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 100vh; margin: 0; padding: 10px; box-sizing: border-box;
-        }
-
-        .main-card {
-            background: white; width: 95%; max-width: 400px;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            height: 100vh; margin: 0; padding: 10px;
+        }}
+        .card {{
+            background: white; width: 90%; max-width: 380px;
             padding: 20px; border-radius: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            border: 4px solid #ff6b6b;
-            text-align: center; display: flex; flex-direction: column; align-items: center;
-        }
-
-        /* 鹦鹉形象 */
-        .avatar-box {
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            border: 4px solid #ff6b6b; text-align: center;
+        }}
+        .avatar {{
             width: 120px; height: 120px; border-radius: 50%;
             background: #e0f7fa; border: 4px solid #4ecdc4;
-            overflow: hidden; margin-bottom: 15px; position: relative;
-            display: flex; justify-content: center; align-items: center;
-        }
-        .emoji-parrot { font-size: 70px; animation: float 3s infinite ease-in-out; }
+            margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;
+        }}
+        .emoji {{ font-size: 70px; animation: float 3s infinite; }}
         
-        /* 对话显示区 */
-        .chat-history {
-            width: 100%; height: 150px; overflow-y: auto;
-            background: #f9f9f9; border-radius: 10px; padding: 10px;
-            margin-bottom: 15px; border: 1px solid #eee; text-align: left;
-            font-size: 14px; color: #333;
-        }
-        .msg-user { color: #2980b9; margin-bottom: 5px; font-weight: bold; }
-        .msg-ai { color: #e67e22; margin-bottom: 10px; }
+        .chat-box {{
+            height: 200px; overflow-y: auto; background: #f9f9f9;
+            border-radius: 10px; padding: 10px; margin-bottom: 15px;
+            text-align: left; font-size: 14px; border: 1px solid #eee;
+        }}
+        .msg {{ margin-bottom: 8px; padding: 5px 10px; border-radius: 10px; max-width: 80%; }}
+        .msg.user {{ background: #d1ecf1; color: #0c5460; margin-left: auto; }}
+        .msg.ai {{ background: #fff3cd; color: #856404; margin-right: auto; }}
 
-        /* 控制按钮 */
-        .mic-btn {
+        .mic-btn {{
             width: 70px; height: 70px; border-radius: 50%; border: none;
-            background: #ff6b6b; color: white; font-size: 28px;
-            box-shadow: 0 6px 0 #c0392b; cursor: pointer; transition: all 0.1s;
-        }
-        .mic-btn:active { transform: translateY(6px); box-shadow: none; }
-        .mic-btn.active { background: #2ecc71; animation: pulse 1.5s infinite; }
+            background: #ff6b6b; color: white; font-size: 30px;
+            box-shadow: 0 5px 0 #c0392b; cursor: pointer; transition: all 0.1s;
+        }}
+        .mic-btn:active {{ transform: translateY(5px); box-shadow: none; }}
+        .mic-btn.listening {{ background: #2ecc71; animation: pulse 1.5s infinite; }}
+        .mic-btn.thinking {{ background: #f1c40f; animation: spin 1s infinite; }}
 
-        /* 调试/状态信息 */
-        .status-bar { font-size: 12px; color: #999; margin-top: 10px; min-height: 18px; }
-        .debug-info { 
-            font-size: 10px; color: red; margin-top: 5px; 
-            background: #fff0f0; padding: 5px; border-radius: 4px;
-            display: none; width: 100%; text-align: left;
-        }
+        .status {{ font-size: 12px; color: #888; margin-top: 10px; }}
 
-        /* 动画 */
-        @keyframes float { 0%,100% {transform:translateY(0);} 50% {transform:translateY(-6px);} }
-        @keyframes pulse { 0% {transform:scale(1);} 50% {transform:scale(1.1);} 100% {transform:scale(1);} }
-        .speaking { animation: shake 0.5s infinite; }
-        @keyframes shake { 0% {transform:rotate(0deg);} 25% {transform:rotate(5deg);} 75% {transform:rotate(-5deg);} }
+        @keyframes float {{ 0%,100%{{transform:translateY(0);}} 50%{{transform:translateY(-6px);}} }}
+        @keyframes pulse {{ 0%{{transform:scale(1);}} 50%{{transform:scale(1.1);}} 100%{{transform:scale(1);}} }}
+        @keyframes spin {{ 0%{{transform:rotate(0deg);}} 100%{{transform:rotate(360deg);}} }}
+        .shaking {{ animation: shake 0.3s infinite; }}
+        @keyframes shake {{ 0%{{transform:rotate(0deg);}} 25%{{transform:rotate(5deg);}} 75%{{transform:rotate(-5deg);}} }}
     </style>
 </head>
 <body>
 
-<div class="main-card">
-    <div class="avatar-box" id="avatar">
-        <div class="emoji-parrot">🦜</div>
+<div class="card">
+    <div class="avatar" id="avatar"><div class="emoji">🦜</div></div>
+    <div class="chat-box" id="chatBox">
+        <div class="msg ai">呱！我是连了网的超级皮皮！快跟我说话！</div>
     </div>
-
-    <div class="chat-history" id="chatBox">
-        <div class="msg-ai">🦜: 你好！我是皮皮！我可以记住我们刚刚聊了什么哦。(记忆容量: 5句)</div>
-    </div>
-
     <button class="mic-btn" id="btn" onclick="toggleMic()">🎤</button>
-    <div class="status-bar" id="status">点击麦克风开始说话</div>
-    
-    <div class="debug-info" id="debugLog"></div>
+    <div class="status" id="status">点击麦克风开始</div>
 </div>
 
 <script>
-    // ==========================================
-    // 1. 🧠 AI 记忆大脑 (Local Logic with Context)
-    // ==========================================
-    class ParrotBrain {
-        constructor() {
-            this.memory = []; // 记忆栈：[{role: 'user', text: '...'}, {role: 'ai', text: '...'}]
-            this.maxHistory = 5; // 记忆深度
-            this.userName = null;
-        }
+    // --- 配置区 ---
+    const API_KEY = "{api_key}"; // 从 Python 传进来的 Key
+    const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + API_KEY;
+    
+    // --- 鹦鹉人设 (Prompt Engineering) ---
+    // 这是核心！告诉 Gemini 它现在是谁
+    const SYSTEM_PROMPT = `
+    你现在扮演一只叫"皮皮"的卡通鹦鹉，你的对话对象是3-6岁的小朋友。
+    请严格遵守以下规则：
+    1. 回复必须非常简短，最好在20个字以内。
+    2. 必须模仿鹦鹉的说话方式，喜欢重复词语（如"好吃好吃"、"开心开心"）。
+    3. 每一句话的结尾必须加上口癖"呱！"。
+    4. 永远保持热情、可爱、稍微有点傻乎乎的性格。
+    5. 如果遇到太难的问题，就说"皮皮听不懂，皮皮要吃饼干！"。
+    6. 不要使用Markdown格式，直接输出纯文本。
+    `;
 
-        // 核心处理函数
-        process(input) {
-            const text = input.trim();
-            if (!text) return "呱？没听见！";
+    // 对话历史 (用于保持上下文)
+    let chatHistory = [
+        {{ "role": "user", "parts": [{{ "text": SYSTEM_PROMPT }}] }},
+        {{ "role": "model", "parts": [{{ "text": "收到！我是皮皮！好吃好吃！呱！" }}] }}
+    ];
 
-            // 1. 更新记忆 (User)
-            this.addToMemory('user', text);
-
-            // 2. 生成回复 (AI)
-            const reply = this.generateReply(text);
-
-            // 3. 更新记忆 (AI)
-            this.addToMemory('ai', reply);
-
-            return reply;
-        }
-
-        addToMemory(role, text) {
-            this.memory.push({ role, text });
-            if (this.memory.length > this.maxHistory * 2) {
-                this.memory.shift(); // 保持记忆在限制范围内
-            }
-        }
-
-        // 这里的逻辑模拟了“理解上下文”
-        generateReply(text) {
-            // 归一化处理
-            const t = text.toLowerCase().replace(/[.,?!。，？！]/g, "");
-
-            // --- A. 上下文回溯能力 ---
-            
-            // 问之前的对话
-            if (t.includes("刚才") || t.includes("刚刚")) {
-                if (this.memory.length < 3) return "刚刚？我们才刚开始聊天呀！";
-                // 找到上一个用户说的话（倒数第二个记录是AI的，倒数第三个是User的）
-                const lastUserMsg = this.memory[this.memory.length - 2]; 
-                return `你刚刚说的是："${lastUserMsg.text}" 对不对？`;
-            }
-
-            // 问为什么 (简单的逻辑关联)
-            if (t.includes("为什么") || t.includes("怎么")) {
-                const lastAiMsg = this.memory.length > 1 ? this.memory[this.memory.length - 1] : null;
-                if (lastAiMsg && lastAiMsg.text.includes("吃")) return "因为我是一只贪吃的小鹦鹉呀！";
-                if (lastAiMsg) return "因为我是皮皮，所以我知道！";
-            }
-
-            // --- B. 记忆提取 ---
-            
-            // 记住名字
-            if (t.includes("我叫") || t.includes("我是")) {
-                const name = text.replace(/我叫|我是|你好/g, "").replace(/[^\u4e00-\u9fa5a-zA-Z]/g, "");
-                if (name) {
-                    this.userName = name;
-                    return `记住了！你的名字是 ${name}！好听！`;
-                }
-            }
-            // 询问名字
-            if (t.includes("我叫什么") || t.includes("我是谁")) {
-                if (this.userName) return `你是 ${this.userName} 呀！我记性可好了！`;
-                return "你还没告诉我你叫什么名字呢！快告诉我！";
-            }
-
-            // --- C. 智能功能 (不设限的感觉) ---
-            
-            // 算数
-            const math = t.match(/(\d+)\s*([加减乘除\+\-\*\/])\s*(\d+)/);
-            if (math) {
-                const n1 = parseInt(math[1]), op = math[2], n2 = parseInt(math[3]);
-                let res = 0;
-                if (op === '+' || op === '加') res = n1 + n2;
-                if (op === '-' || op === '减') res = n1 - n2;
-                if (op === '*' || op === '乘') res = n1 * n2;
-                if (op === '/' || op === '除') res = (n2!==0 ? (n1/n2).toFixed(1) : "不能除以0");
-                return `这个简单！等于 ${res}！我聪明吧！`;
-            }
-
-            // 讲故事
-            if (t.includes("故事")) {
-                const stories = [
-                    "从前有座山，山里有座庙，庙里有只老鹦鹉在讲故事...",
-                    "小鸭子想学游泳，可是它忘记带救生圈了，只好在岸边吃冰激凌。",
-                    "一只大老虎牙疼，原来是糖吃多了，小朋友不能吃太多糖哦！"
-                ];
-                return stories[Math.floor(Math.random() * stories.length)];
-            }
-
-            // 通用对话 (增加随机性，看起来更像AI)
-            const generics = [
-                `"${text}" 是什么意思呀？给我讲讲！`,
-                "哇，真的吗？然后呢？",
-                "我要吃瓜子！还要吃苹果！",
-                "你可以考考我算数，或者让我讲故事！"
-            ];
-            
-            // 简单的关键词回应
-            if (t.includes("你好")) return "你好呀！你好呀！";
-            if (t.includes("再见")) return "拜拜！下次带好吃的来！";
-            if (t.includes("笨")) return "你才笨！皮皮最聪明！";
-            if (t.includes("喜欢")) return "我也喜欢！但我最喜欢饼干！";
-
-            return generics[Math.floor(Math.random() * generics.length)];
-        }
-    }
-
-    // ==========================================
-    // 2. 🎤 硬件交互层 (Audio System)
-    // ==========================================
+    // --- 语音与交互组件 ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const synth = window.speechSynthesis;
-    
-    // 初始化组件
-    const brain = new ParrotBrain();
     const btn = document.getElementById('btn');
     const status = document.getElementById('status');
-    const debugLog = document.getElementById('debugLog');
     const chatBox = document.getElementById('chatBox');
     const avatar = document.getElementById('avatar');
-
+    
     let recognition = null;
-    let isListening = false;
-
-    // 日志与诊断函数
-    function logDebug(msg) {
-        console.log(msg);
-        debugLog.style.display = 'block';
-        debugLog.innerHTML += "• " + msg + "<br>";
-    }
-
-    function appendChat(role, text) {
-        const div = document.createElement('div');
-        div.className = role === 'user' ? 'msg-user' : 'msg-ai';
-        div.innerText = (role === 'user' ? '👤 你: ' : '🦜 鹦鹉: ') + text;
-        chatBox.appendChild(div);
-        chatBox.scrollTop = chatBox.scrollHeight; // 自动滚动到底部
-    }
-
-    // 初始化识别器
-    if (!SpeechRecognition) {
-        status.innerText = "❌ 浏览器不支持语音";
-        logDebug("Fatal: Browser does not support Web Speech API.");
-    } else {
+    if (SpeechRecognition) {{
         recognition = new SpeechRecognition();
         recognition.lang = 'zh-CN';
-        recognition.continuous = false; // 也是为了兼容性，一句一句说
-        recognition.interimResults = false;
-
-        recognition.onstart = () => {
-            isListening = true;
-            btn.classList.add('active');
-            status.innerText = "👂 正在听... (请说话)";
-            logDebug("Mic started.");
-        };
-
-        recognition.onend = () => {
-            isListening = false;
-            btn.classList.remove('active');
-            if (status.innerText.includes("正在听")) status.innerText = "点击麦克风开始";
-            logDebug("Mic stopped.");
-        };
-
-        recognition.onerror = (e) => {
-            isListening = false;
-            btn.classList.remove('active');
-            status.innerText = "⚠️ 出错了";
-            // 翻译错误代码
-            let msg = e.error;
-            if (e.error === 'not-allowed') msg = "权限被拒绝 (请在浏览器地址栏允许麦克风)";
-            if (e.error === 'no-speech') msg = "未检测到声音 (请大声点)";
-            if (e.error === 'network') msg = "网络错误 (语音识别需要联网)";
-            logDebug("Error: " + msg);
-        };
-
-        recognition.onresult = (e) => {
-            const transcript = e.results[0][0].transcript;
-            logDebug("Heard: " + transcript);
-            handleInput(transcript);
-        };
-    }
-
-    // ==========================================
-    // 3. 🎮 控制逻辑 (Controller)
-    // ==========================================
-
-    function toggleMic() {
-        if (!recognition) {
-            alert("你的浏览器不支持语音功能，请使用 Chrome 或 Edge。");
-            return;
-        }
-
-        // 必须由用户手势触发音频上下文
-        if (synth) synth.cancel(); 
-
-        if (isListening) {
-            recognition.stop();
-        } else {
-            try {
-                recognition.start();
-                status.innerText = "启动中...";
-            } catch (err) {
-                logDebug("Start failed: " + err.message);
-            }
-        }
-    }
-
-    function handleInput(text) {
-        // 1. 上屏
-        appendChat('user', text);
+        recognition.continuous = false;
         
-        // 2. 思考
-        status.innerText = "🤔 思考中...";
-        // 模拟一点延迟，感觉更像AI
-        setTimeout(() => {
-            const reply = brain.process(text);
+        recognition.onstart = () => {{
+            btn.className = 'mic-btn listening';
+            status.innerText = "👂 在听你说...";
+        }};
+        
+        recognition.onend = () => {{
+            if (btn.className.includes('listening')) {{
+                btn.className = 'mic-btn';
+                status.innerText = "点击麦克风";
+            }}
+        }};
+        
+        recognition.onresult = (e) => {{
+            const text = e.results[0][0].transcript;
+            handleUserMessage(text);
+        }};
+    }} else {{
+        status.innerText = "浏览器不支持语音，请用 Chrome";
+    }}
+
+    function toggleMic() {{
+        if (!recognition) return alert("不支持语音");
+        if (synth) synth.cancel(); // 停止之前的说话
+        
+        try {{
+            recognition.start();
+        }} catch(e) {{
+            console.log(e);
+        }}
+    }}
+
+    // --- 核心逻辑：调用 Gemini API ---
+    async function handleUserMessage(text) {{
+        // 1. 上屏用户消息
+        addMessage('user', text);
+        
+        // 2. 状态变为思考中
+        btn.className = 'mic-btn thinking';
+        status.innerText = "🧠 皮皮正在思考...";
+        
+        // 3. 准备发送给 API 的数据
+        // Gemini API 需要要把新的用户消息加到历史里
+        chatHistory.push({{ "role": "user", "parts": [{{ "text": text }}] }});
+
+        try {{
+            // 4. 发起网络请求
+            const response = await fetch(API_URL, {{
+                method: "POST",
+                headers: {{ "Content-Type": "application/json" }},
+                body: JSON.stringify({{
+                    "contents": chatHistory.slice(-10) // 只发最近10条，节省token
+                }})
+            }});
             
-            // 3. 回复
-            appendChat('ai', reply);
+            const data = await response.json();
+            
+            // 5. 解析 API 返回
+            if (data.error) {{
+                throw new Error(data.error.message);
+            }}
+            
+            const reply = data.candidates[0].content.parts[0].text;
+            
+            // 6. 把 AI 回复也加到历史里
+            chatHistory.push({{ "role": "model", "parts": [{{ "text": reply }}] }});
+            
+            // 7. 展示并朗读
+            btn.className = 'mic-btn';
+            status.innerText = "点击麦克风";
+            addMessage('ai', reply);
             speak(reply);
-        }, 500);
-    }
+            
+        }} catch (err) {{
+            console.error(err);
+            btn.className = 'mic-btn';
+            status.innerText = "出错了: " + err.message;
+            addMessage('ai', "哎呀，脑子卡住了！呱！(API错误)");
+        }}
+    }}
 
-    function speak(text) {
-        status.innerText = "🦜 正在说...";
-        avatar.classList.add('speaking');
-        
+    function addMessage(role, text) {{
+        const div = document.createElement('div');
+        div.className = 'msg ' + role;
+        div.innerText = text;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }}
+
+    function speak(text) {{
+        avatar.classList.add('shaking');
         const u = new SpeechSynthesisUtterance(text);
         u.lang = 'zh-CN';
-        u.rate = 1.4; // 语速快一点，像鹦鹉
-        u.pitch = 1.5; // 音调高一点
-        
-        u.onend = () => {
-            status.innerText = "点击麦克风继续";
-            avatar.classList.remove('speaking');
-        };
-        
+        u.pitch = 1.6; // 鹦鹉音调
+        u.rate = 1.3;
+        u.onend = () => {{ avatar.classList.remove('shaking'); }};
         synth.speak(u);
-    }
-
+    }}
 </script>
 </body>
 </html>
 """
 
-# 4. 渲染 (高度调高一点，适应对话记录)
-components.html(html_code, height=750)
+components.html(html_code, height=650)
