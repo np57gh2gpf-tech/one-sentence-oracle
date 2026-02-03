@@ -2,278 +2,268 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # 页面基础设置
-st.set_page_config(page_title="皮皮 (语音修复版)", page_icon="🦜", layout="centered")
+st.set_page_config(page_title="皮皮鹦鹉", page_icon="🦜", layout="centered")
 
-# 隐藏不必要的菜单
+# 隐藏不需要的菜单，让界面更干净
 st.markdown("""
 <style>
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
+/* 手机端优化 */
+.stApp { background-color: #fceea7; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 核心代码 ---
+# --- 核心代码 (HTML/JS/CSS) ---
 html_code = """
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Smart Parrot Fixed</title>
+    <title>Parrot Final</title>
     <style>
-        /* 界面样式 */
+        /* 1. 基础布局 */
         body {
-            font-family: "Comic Sans MS", "Microsoft YaHei", "幼圆", sans-serif;
-            background-color: #fceea7;
-            background-image: radial-gradient(#ffd700 10%, transparent 10%);
-            background-size: 30px 30px;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 100vh; margin: 0; overflow: hidden;
+            font-family: "Comic Sans MS", "YouYuan", "幼圆", sans-serif;
+            background-color: #fceea7; /* 鹅黄色背景 */
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            height: 100vh; margin: 0; padding-top: 20px;
+            overflow: hidden; touch-action: manipulation;
         }
 
+        /* 2. 主容器 */
         .container {
-            background-color: #fff; padding: 20px; border-radius: 25px;
-            width: 90%; max-width: 400px; text-align: center; 
-            border: 6px solid #ff6b6b; box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            background-color: #fff; padding: 20px; border-radius: 20px;
+            width: 85%; max-width: 350px; text-align: center; 
+            border: 5px solid #ff6b6b; box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+            position: relative; z-index: 10;
         }
 
-        h1 { color: #ff6b6b; margin: 0 0 15px 0; font-size: 24px; }
+        h1 { color: #ff6b6b; margin: 0 0 10px 0; font-size: 22px; }
 
-        .parrot-wrapper {
-            width: 150px; height: 150px; margin: 0 auto 20px; position: relative;
-        }
-        .parrot-display {
-            width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
-            border: 5px solid #4ecdc4; background-color: #e0f7fa; 
+        /* 3. 鹦鹉头像 */
+        .parrot-box {
+            width: 140px; height: 140px; margin: 0 auto 15px; border-radius: 50%;
+            background: #e0f7fa; border: 4px solid #4ecdc4; overflow: hidden;
             display: flex; align-items: center; justify-content: center;
+            position: relative; z-index: 5;
         }
         .parrot-img { width: 100%; height: 100%; object-fit: cover; }
-        .parrot-emoji { font-size: 80px; animation: float 3s ease-in-out infinite; }
+        .parrot-emoji { font-size: 70px; animation: float 3s infinite; }
 
-        /* 对话框 */
-        .chat-bubble {
-            background-color: #4ecdc4; color: white; padding: 15px; border-radius: 18px;
-            min-height: 50px; margin-bottom: 20px; font-size: 1.1em; line-height: 1.4;
-            position: relative; display: flex; align-items: center; justify-content: center; flex-direction: column;
+        /* 4. 对话气泡 */
+        .bubble {
+            background: #4ecdc4; color: white; padding: 12px; border-radius: 15px;
+            min-height: 50px; margin-bottom: 20px; position: relative;
+            font-size: 16px; line-height: 1.4; display: flex; align-items: center; justify-content: center;
         }
-        .chat-bubble::after {
-            content: ''; position: absolute; top: -10px; left: 50%; margin-left: -10px;
-            border-width: 0 10px 10px; border-style: solid; border-color: #4ecdc4 transparent;
+        .bubble::after {
+            content: ''; position: absolute; top: -10px; left: 50%; margin-left: -8px;
+            border-width: 0 8px 8px; border-style: solid; border-color: #4ecdc4 transparent;
         }
 
-        /* 按钮 */
-        .control-btn {
+        /* 5. 麦克风按钮 (绝对置顶，防止点不到) */
+        .mic-btn {
             width: 70px; height: 70px; border-radius: 50%; border: none;
-            background-color: #ff6b6b; color: white; font-size: 28px;
-            box-shadow: 0 5px 0 #c0392b; cursor: pointer; transition: all 0.2s;
-            display: block; margin: 0 auto;
+            background: #ff6b6b; color: white; font-size: 30px;
+            box-shadow: 0 5px 0 #c0392b; cursor: pointer; 
+            display: block; margin: 0 auto 10px auto;
+            position: relative; z-index: 100; /* 确保在最上层 */
+            transition: transform 0.1s;
         }
-        .control-btn:active { transform: translateY(5px); box-shadow: 0 0 0; }
-        .control-btn.listening { background-color: #2ecc71; animation: pulse 1.5s infinite; }
+        .mic-btn:active { transform: translateY(5px); box-shadow: none; }
+        .mic-btn.active { background: #2ecc71; animation: pulse 1.5s infinite; }
 
-        /* 状态与错误信息 */
-        .status-text { font-size: 14px; color: #888; margin-top: 10px; min-height: 20px; }
-        .error-msg { color: red; font-size: 12px; margin-top: 5px; display: none; }
-
-        /* 备用输入框 (默认隐藏) */
-        .fallback-input {
-            display: none; width: 80%; padding: 10px; border: 2px solid #ddd;
-            border-radius: 10px; margin-top: 10px; font-size: 16px;
+        /* 6. 备用输入框 (默认隐藏) */
+        .fallback-area {
+            display: none; margin-top: 10px; width: 100%;
         }
+        .input-box {
+            width: 70%; padding: 10px; border: 2px solid #ddd; border-radius: 10px; font-size: 14px;
+        }
+        .send-btn {
+            width: 20%; padding: 10px; background: #ff6b6b; color: white; border: none; border-radius: 10px;
+        }
+
+        /* 状态文字 */
+        .status { font-size: 12px; color: #888; min-height: 20px; }
+        .error { color: red; font-size: 12px; display: none; margin-top: 5px; }
 
         /* 动画 */
-        @keyframes float { 0%, 100% {transform: translateY(0);} 50% {transform: translateY(-8px);} }
+        @keyframes float { 0%, 100% {transform: translateY(0);} 50% {transform: translateY(-5px);} }
         @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.1);} 100% {transform: scale(1);} }
         .shaking { animation: shake 0.4s infinite; }
         @keyframes shake { 0% {transform: rotate(0deg);} 25% {transform: rotate(5deg);} 75% {transform: rotate(-5deg);} }
-
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🦜 皮皮</h1>
+    <h1>🦜 超级皮皮</h1>
     
-    <div class="parrot-wrapper">
-        <div class="parrot-display" id="parrotContainer">
-            <img src="parrot.jpg" class="parrot-img" onerror="this.style.display='none'; document.getElementById('emoji').style.display='block';">
-            <div id="emoji" class="parrot-emoji" style="display:none">🦜</div>
-        </div>
+    <div class="parrot-box" id="parrot">
+        <img src="parrot.jpg" class="parrot-img" onerror="this.style.display='none'; document.getElementById('emoji').style.display='block';">
+        <div id="emoji" class="parrot-emoji" style="display:none">🦜</div>
     </div>
 
-    <div class="chat-bubble" id="responseBox">
-        你好！我是皮皮！<br>点按钮跟我说话！
+    <div class="bubble" id="msgBox">
+        你好！我是皮皮！<br>点按钮和我说话！
     </div>
 
-    <button class="control-btn" id="micBtn" onclick="toggleListening()">🎤</button>
+    <button class="mic-btn" id="micBtn" onclick="handleClick()">🎤</button>
     
-    <div class="status-text" id="statusLog">点击开始</div>
-    <div class="error-msg" id="errorLog"></div>
+    <div class="status" id="statusText">点击麦克风开始</div>
+    <div class="error" id="errorText"></div>
 
-    <input type="text" id="typeInput" class="fallback-input" placeholder="麦克风没开? 在这打字吧!" onkeypress="handleType(event)">
+    <div class="fallback-area" id="fallbackArea">
+        <input type="text" id="txtInput" class="input-box" placeholder="在这打字也可以哦..." onkeypress="if(event.key==='Enter') sendText()">
+        <button class="send-btn" onclick="sendText()">说</button>
+    </div>
 </div>
 
 <script>
-    // --- 1. 鹦鹉大脑 (Logic) ---
+    // --- 1. 核心逻辑 (Brain) ---
     class ParrotBrain {
         constructor() {
             this.name = "皮皮";
             this.userName = "";
             this.stories = [
-                "小猪吃太饱飘到了天上变成了飞猪！🐷",
-                "月亮婆婆出来值班，星星都笑醒了。⭐",
-                "蜗牛爬山爬了三天，终于爬到了花盆上！🐌"
+                "小猪吃太饱，变成了飞猪！🐷",
+                "月亮婆婆值班，星星都笑醒了。⭐",
+                "蜗牛爬山爬了三天，终于爬到了门口。🐌"
             ];
         }
-        think(text) {
-            const cleanText = text.replace(/[.,?!。，？！]/g, "").trim();
-            if (!cleanText) return "呱？没听清！";
+        reply(text) {
+            const t = text.replace(/[.,?!]/g, "").trim();
+            if (!t) return "呱？没听见！";
             
-            // 逻辑处理
-            if (cleanText.includes("我叫")) {
-                this.userName = cleanText.split("我叫")[1];
-                return `记住了！你叫${this.userName}！`;
-            }
-            if (cleanText.includes("我是谁")) return this.userName ? `你是${this.userName}！` : "你还没告诉我名字呢！";
-            if (cleanText.includes("故事")) return "讲个故事：\n" + this.stories[Math.floor(Math.random() * this.stories.length)];
+            if (t.includes("我叫")) { this.userName = t.split("我叫")[1]; return `记住了！你叫${this.userName}！`; }
+            if (t.includes("我是谁")) return this.userName ? `你是${this.userName}！` : "你还没告诉我名字！";
+            if (t.includes("故事")) return "讲个故事：\n" + this.stories[Math.floor(Math.random()*this.stories.length)];
             
             // 数学
-            const mathMatch = cleanText.match(/(\d+)\s*([加减\+\-])\s*(\d+)/);
-            if (mathMatch) {
-                const n1 = parseInt(mathMatch[1]);
-                const op = mathMatch[2];
-                const n2 = parseInt(mathMatch[3]);
-                let res = (op === '加' || op === '+') ? n1 + n2 : n1 - n2;
-                return `我知道！等于 ${res}！`;
+            const m = t.match(/(\d+)\s*([加减\+\-])\s*(\d+)/);
+            if (m) {
+                const n1 = parseInt(m[1]), op = m[2], n2 = parseInt(m[3]);
+                return `我知道！等于 ${op==='+'||op==='加' ? n1+n2 : n1-n2}！`;
             }
-
-            // 百科
-            if (cleanText.includes("名字")) return "我叫皮皮！";
-            if (cleanText.includes("天空")) return "天空是蓝色的！";
-            if (cleanText.includes("苹果")) return "苹果红红的！";
-            if (cleanText.includes("你好")) return "你好呀！要吃饼干吗？";
-
-            return "你说：" + cleanText + "！呱！";
+            
+            if (t.includes("名字")) return "我叫皮皮！";
+            if (t.includes("几岁")) return "我三岁啦！";
+            if (t.includes("吃")) return "我要吃饼干！🍪";
+            if (t.includes("你好")) return "你好呀！扑棱扑棱！";
+            
+            return "你说：" + t + "！呱！";
         }
     }
 
-    // --- 2. 核心控制 ---
+    // --- 2. 控制系统 ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const synth = window.speechSynthesis;
     let recognition;
     const brain = new ParrotBrain();
-    
-    const micBtn = document.getElementById('micBtn');
-    const statusLog = document.getElementById('statusLog');
-    const errorLog = document.getElementById('errorLog');
-    const parrotDiv = document.getElementById('parrotContainer');
-    const typeInput = document.getElementById('typeInput');
 
-    // 初始化
+    const btn = document.getElementById('micBtn');
+    const msgBox = document.getElementById('msgBox');
+    const statusText = document.getElementById('statusText');
+    const errorText = document.getElementById('errorText');
+    const parrot = document.getElementById('parrot');
+    const fallbackArea = document.getElementById('fallbackArea');
+    const txtInput = document.getElementById('txtInput');
+
+    // 检查浏览器支持情况
     if (!SpeechRecognition) {
-        showError("你的浏览器不支持语音(Web Speech API)。请使用 Chrome。");
-        enableFallbackMode();
+        showFallback("你的浏览器不支持语音，请用打字哦！");
     } else {
         recognition = new SpeechRecognition();
         recognition.lang = 'zh-CN';
-        recognition.continuous = false; 
+        recognition.continuous = false;
 
         recognition.onstart = () => {
-            micBtn.classList.add('listening');
-            statusLog.innerText = "👂 正在听...";
-            errorLog.style.display = 'none';
+            btn.classList.add('active');
+            statusText.innerText = "👂 正在听...";
+            errorText.style.display = 'none';
         };
-
         recognition.onend = () => {
-            micBtn.classList.remove('listening');
-            if (statusLog.innerText === "👂 正在听...") {
-                statusLog.innerText = "点击开始";
-            }
+            btn.classList.remove('active');
+            if(statusText.innerText === "👂 正在听...") statusText.innerText = "点击开始";
         };
-
-        recognition.onresult = (event) => {
-            const text = event.results[0][0].transcript;
-            processInput(text);
+        recognition.onresult = (e) => {
+            const text = e.results[0][0].transcript;
+            process(text);
         };
-
         recognition.onerror = (e) => {
             console.error(e.error);
-            micBtn.classList.remove('listening');
-            
-            if (e.error === 'not-allowed') {
-                showError("❌ 麦克风权限被拒绝！请点击浏览器地址栏的小锁开启权限。");
-                enableFallbackMode();
+            btn.classList.remove('active');
+            // 核心修复：如果报错是 not-allowed，说明权限被锁，直接切到打字模式
+            if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+                showFallback("❌ 麦克风被浏览器锁住了！请在下面打字：");
             } else if (e.error === 'no-speech') {
-                statusLog.innerText = "没听到声音，再试一次...";
+                statusText.innerText = "没听到声音，再试一次...";
             } else {
-                showError("❌ 发生错误: " + e.error);
-                enableFallbackMode(); // 出错时也显示打字框
+                statusText.innerText = "出错了: " + e.error;
             }
         };
     }
 
-    // --- 3. 交互逻辑 ---
+    // --- 3. 交互函数 ---
     
-    function toggleListening() {
-        if (!recognition) return;
-        
-        // 如果正在说话，先打断
-        synth.cancel();
+    function handleClick() {
+        // 先检查是否有语音合成（TTS）能力，用来激活声音
+        if (synth) synth.cancel();
 
-        if (micBtn.classList.contains('listening')) {
+        if (!recognition) {
+            showFallback("语音功能不可用，请打字。");
+            return;
+        }
+
+        if (btn.classList.contains('active')) {
             recognition.stop();
         } else {
             try {
                 recognition.start();
-                statusLog.innerText = "正在启动麦克风...";
-            } catch (err) {
-                // 如果 start() 报错，通常是因为没权限或者还没准备好
-                showError("无法启动麦克风: " + err.message);
-                enableFallbackMode();
+                statusText.innerText = "启动中...";
+            } catch (e) {
+                // 如果启动直接报错，大概率是环境问题
+                showFallback("无法启动麦克风，请在下面打字：");
             }
         }
     }
 
-    function processInput(text) {
-        statusLog.innerText = "听到: " + text;
-        const reply = brain.think(text);
-        document.getElementById('responseBox').innerHTML = reply.replace(/\\n/g, '<br>');
-        speak(reply);
+    function process(text) {
+        statusText.innerText = "听到: " + text;
+        const replyText = brain.reply(text);
+        
+        // 显示
+        msgBox.innerHTML = replyText.replace(/\\n/g, '<br>');
+        
+        // 播放语音
+        speak(replyText);
     }
 
     function speak(text) {
-        parrotDiv.classList.add('shaking');
-        statusLog.innerText = "🦜 皮皮正在说...";
-        
+        parrot.classList.add('shaking');
         const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'zh-CN';
-        u.pitch = 1.6;
-        u.rate = 1.3;
-        
-        u.onend = () => {
-            parrotDiv.classList.remove('shaking');
-            statusLog.innerText = "点击按钮继续";
-        };
-        
+        u.lang = 'zh-CN'; u.pitch = 1.6; u.rate = 1.3;
+        u.onend = () => { parrot.classList.remove('shaking'); };
         synth.speak(u);
     }
 
-    // --- 4. 备用打字模式 ---
-    function enableFallbackMode() {
-        typeInput.style.display = 'block';
-        statusLog.innerText = "语音不可用，请使用下方输入框 👇";
+    // --- 4. 备用模式 (打字) ---
+    function showFallback(msg) {
+        errorText.innerText = msg;
+        errorText.style.display = 'block';
+        fallbackArea.style.display = 'block'; // 显示输入框
+        btn.style.display = 'none'; // 隐藏没用的麦克风按钮
     }
 
-    function handleType(e) {
-        if (e.key === 'Enter') {
-            processInput(typeInput.value);
-            typeInput.value = '';
+    function sendText() {
+        const val = txtInput.value;
+        if (val) {
+            process(val);
+            txtInput.value = '';
         }
-    }
-
-    function showError(msg) {
-        errorLog.innerText = msg;
-        errorLog.style.display = 'block';
     }
 
 </script>
@@ -281,4 +271,4 @@ html_code = """
 </html>
 """
 
-components.html(html_code, height=700)
+components.html(html_code, height=750)
