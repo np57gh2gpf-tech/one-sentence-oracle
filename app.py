@@ -1,260 +1,159 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import requests
+import json
+import time
 
-# --- 1. 页面配置 ---
-st.set_page_config(page_title="皮皮鹦鹉 (AI版)", page_icon="🦜", layout="centered")
+# --- 1. 配置与密钥 ---
+st.set_page_config(page_title="皮皮鹦鹉 (Python后端版)", page_icon="🦜", layout="centered")
 
-# 隐藏无关菜单
+# 你的 Key (Python 端调用，更安全稳定)
+API_KEY = "AIzaSyDbE2a89o6fshlklYKso-0uvBKoL9e51kk"
+
+# --- 2. 核心函数: Python 调用 Google Gemini ---
+def ask_gemini(text):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+    headers = {"Content-Type": "application/json"}
+    
+    # 鹦鹉人设
+    system_prompt = """
+    你现在是一只叫"皮皮"的鹦鹉，对话对象是3-6岁小朋友。
+    规则：
+    1. 回复必须简短(20字以内)。
+    2. 必须模仿鹦鹉说话，喜欢重复(如"好吃好吃")。
+    3. 句尾加上"呱！"。
+    4. 热情、可爱、傻乎乎。
+    """
+    
+    payload = {
+        "contents": [
+            {"role": "user", "parts": [{"text": system_prompt}]},
+            {"role": "user", "parts": [{"text": text}]}
+        ]
+    }
+    
+    try:
+        # 使用 proxies=None 确保遵循系统代理设置
+        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=10)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result['candidates'][0]['content']['parts'][0]['text']
+        else:
+            return f"呱！网络连不上啦！(错误码: {response.status_code})"
+    except Exception as e:
+        return f"呱！脑子卡住了！(错误: {str(e)})"
+
+# --- 3. 样式注入 (CSS) ---
 st.markdown("""
 <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
     .stApp { background-color: #fceea7; }
+    /* 隐藏顶部Header */
+    header {visibility: hidden;}
+    
+    /* 鹦鹉卡片 */
+    .parrot-card {
+        background: white;
+        padding: 20px;
+        border-radius: 20px;
+        border: 5px solid #ff6b6b;
+        text-align: center;
+        margin-bottom: 20px;
+        box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+    }
+    
+    /* 鹦鹉动画 */
+    .avatar {
+        width: 120px; height: 120px; 
+        border-radius: 50%;
+        background: #e0f7fa; 
+        border: 4px solid #4ecdc4;
+        margin: 0 auto;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 70px;
+        animation: float 3s infinite ease-in-out;
+    }
+    
+    .chat-bubble {
+        background: #4ecdc4;
+        color: white;
+        padding: 15px;
+        border-radius: 15px;
+        margin-top: 15px;
+        font-size: 18px;
+        position: relative;
+    }
+    .chat-bubble::after {
+        content: ''; position: absolute; top: -10px; left: 50%; margin-left: -10px;
+        border-width: 0 10px 10px; border-style: solid; border-color: #4ecdc4 transparent;
+    }
+
+    @keyframes float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. 配置 API Key (已写入) ---
-# ⚠️ 注意：请保管好你的 Key，不要泄露给陌生人
-# 这里的 Key 会被传给下面的 JavaScript 代码
-USER_API_KEY = "AIzaSyDbE2a89o6fshlklYKso-0uvBKoL9e51kk"
+# --- 4. 界面布局 ---
 
-# --- 3. 核心代码 ---
-html_code = f"""
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Parrot AI</title>
-    <style>
-        body {{
-            font-family: "Microsoft YaHei", "Comic Sans MS", sans-serif;
-            background-color: #fceea7;
-            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-            height: 100vh; margin: 0; padding-top: 20px;
-            overflow: hidden; touch-action: manipulation;
-        }}
-        .card {{
-            background: white; width: 90%; max-width: 380px;
-            padding: 20px; border-radius: 20px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-            border: 5px solid #ff6b6b; text-align: center;
-            display: flex; flex-direction: column; height: 80vh;
-        }}
-        
-        /* 鹦鹉头像 */
-        .avatar-container {{
-            flex-shrink: 0; /* 防止头像被挤压 */
-            margin-bottom: 10px;
-        }}
-        .avatar {{
-            width: 120px; height: 120px; border-radius: 50%;
-            background: #e0f7fa; border: 4px solid #4ecdc4;
-            margin: 0 auto; display: flex; align-items: center; justify-content: center;
-            overflow: hidden;
-        }}
-        .emoji {{ font-size: 70px; animation: float 3s infinite; }}
-        
-        /* 聊天记录区 (占满剩余空间) */
-        .chat-box {{
-            flex-grow: 1; overflow-y: auto; background: #f9f9f9;
-            border-radius: 10px; padding: 10px; margin-bottom: 15px;
-            text-align: left; font-size: 15px; border: 1px solid #eee;
-        }}
-        .msg {{ margin-bottom: 10px; padding: 8px 12px; border-radius: 12px; max-width: 85%; line-height: 1.4; }}
-        .msg.user {{ background: #d1ecf1; color: #0c5460; margin-left: auto; border-bottom-right-radius: 2px; }}
-        .msg.ai {{ background: #fff3cd; color: #856404; margin-right: auto; border-bottom-left-radius: 2px; }}
+# 初始化 Session State
+if "history" not in st.session_state:
+    st.session_state.history = "你好！我是皮皮！"
+if "last_audio" not in st.session_state:
+    st.session_state.last_audio = None
 
-        /* 底部控制区 */
-        .controls {{ flex-shrink: 0; }}
-        
-        .mic-btn {{
-            width: 75px; height: 75px; border-radius: 50%; border: none;
-            background: #ff6b6b; color: white; font-size: 32px;
-            box-shadow: 0 5px 0 #c0392b; cursor: pointer; transition: all 0.1s;
-        }}
-        .mic-btn:active {{ transform: translateY(5px); box-shadow: none; }}
-        .mic-btn.listening {{ background: #2ecc71; animation: pulse 1.5s infinite; }}
-        .mic-btn.thinking {{ background: #f1c40f; animation: spin 1s infinite; }}
-
-        .status {{ font-size: 12px; color: #888; margin-top: 10px; min-height: 20px; }}
-
-        /* 动画 */
-        @keyframes float {{ 0%,100%{{transform:translateY(0);}} 50%{{transform:translateY(-6px);}} }}
-        @keyframes pulse {{ 0%{{transform:scale(1);}} 50%{{transform:scale(1.1);}} 100%{{transform:scale(1);}} }}
-        @keyframes spin {{ 0%{{transform:rotate(0deg);}} 100%{{transform:rotate(360deg);}} }}
-        .shaking {{ animation: shake 0.3s infinite; }}
-        @keyframes shake {{ 0%{{transform:rotate(0deg);}} 25%{{transform:rotate(5deg);}} 75%{{transform:rotate(-5deg);}} }}
-    </style>
-</head>
-<body>
-
-<div class="card">
-    <div class="avatar-container">
-        <div class="avatar" id="avatar">
-            <img src="parrot.jpg" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';document.getElementById('e').style.display='block'">
-            <div id="e" class="emoji" style="display:none">🦜</div>
-        </div>
-    </div>
-
-    <div class="chat-box" id="chatBox">
-        <div class="msg ai">呱！我是皮皮！我有超级大脑啦！<br>快问我问题！🍪</div>
-    </div>
-    
-    <div class="controls">
-        <button class="mic-btn" id="btn" onclick="toggleMic()">🎤</button>
-        <div class="status" id="status">点击麦克风开始说话</div>
-    </div>
+# 显示鹦鹉区域
+st.markdown(f"""
+<div class="parrot-card">
+    <div class="avatar">🦜</div>
+    <div class="chat-bubble">{st.session_state.history}</div>
 </div>
+""", unsafe_allow_html=True)
 
-<script>
-    // --- 🔑 API 配置 ---
-    const API_KEY = "{USER_API_KEY}"; // 这里自动填入了你的 Key
-    const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + API_KEY;
+# --- 5. 交互逻辑 (混合输入) ---
+
+st.write("### 👇 和皮皮说话")
+
+# 使用 Streamlit 表单来处理输入
+with st.form("chat_form", clear_on_submit=True):
+    user_input = st.text_input("在这里打字...", placeholder="比如：讲个故事")
+    submitted = st.form_submit_button("发送 🚀")
+
+if submitted and user_input:
+    # 1. 获取 AI 回复
+    ai_reply = ask_gemini(user_input)
+    st.session_state.history = ai_reply
     
-    // --- 🦜 鹦鹉人设 (System Prompt) ---
-    const SYSTEM_PROMPT = `
-    你现在扮演一只叫"皮皮"的卡通鹦鹉，你的对话对象是3-6岁的小朋友。
-    请严格遵守以下规则：
-    1. 回复必须非常简短，最好在25个字以内。
-    2. 必须模仿鹦鹉的说话方式，喜欢重复词语（如"好吃好吃"、"开心开心"）。
-    3. 每一句话的结尾最好加上口癖"呱！"或者"扑棱扑棱！"。
-    4. 永远保持热情、可爱、稍微有点傻乎乎的性格。
-    5. 如果遇到太难的问题（如复杂的科学），就用小孩子能懂的童话方式解释。
-    6. 不要使用Markdown格式，直接输出纯文本。
-    `;
-
-    // 对话历史
-    let chatHistory = [
-        {{ "role": "user", "parts": [{{ "text": SYSTEM_PROMPT }}] }},
-        {{ "role": "model", "parts": [{{ "text": "收到！我是皮皮！好吃好吃！呱！" }}] }}
-    ];
-
-    // --- 组件 ---
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const synth = window.speechSynthesis;
-    const btn = document.getElementById('btn');
-    const status = document.getElementById('status');
-    const chatBox = document.getElementById('chatBox');
-    const avatar = document.getElementById('avatar');
-    
-    let recognition = null;
-    if (SpeechRecognition) {{
-        recognition = new SpeechRecognition();
-        recognition.lang = 'zh-CN';
-        recognition.continuous = false;
-        
-        recognition.onstart = () => {{
-            btn.className = 'mic-btn listening';
-            status.innerText = "👂 在听你说...";
-        }};
-        
-        recognition.onend = () => {{
-            if (btn.className.includes('listening')) {{
-                btn.className = 'mic-btn';
-                status.innerText = "点击麦克风";
-            }}
-        }};
-        
-        recognition.onresult = (e) => {{
-            const text = e.results[0][0].transcript;
-            handleUserMessage(text);
-        }};
-        
-        recognition.onerror = (e) => {{
-            console.error(e);
-            btn.className = 'mic-btn';
-            if(e.error === 'not-allowed') {{
-                status.innerText = "❌ 请允许麦克风权限";
-                addMessage('ai', "我看不到你的麦克风权限！呱！😭");
-            }} else {{
-                status.innerText = "没听清，再试一次";
-            }}
-        }};
-    }} else {{
-        status.innerText = "❌ 浏览器不支持语音";
-    }}
-
-    function toggleMic() {{
-        if (!recognition) return alert("不支持语音");
-        if (synth) synth.cancel(); // 停止说话，准备听
-        
-        try {{
-            recognition.start();
-        }} catch(e) {{
-            console.log("Mic start error:", e);
-        }}
-    }}
-
-    // --- 🧠 核心逻辑：调用 Gemini API ---
-    async function handleUserMessage(text) {{
-        // 1. 上屏
-        addMessage('user', text);
-        
-        // 2. 状态变化
-        btn.className = 'mic-btn thinking';
-        status.innerText = "🧠 皮皮正在思考...";
-        
-        // 3. 准备数据
-        chatHistory.push({{ "role": "user", "parts": [{{ "text": text }}] }});
-
-        try {{
-            // 4. 发起请求
-            const response = await fetch(API_URL, {{
-                method: "POST",
-                headers: {{ "Content-Type": "application/json" }},
-                body: JSON.stringify({{
-                    "contents": chatHistory.slice(-12) // 发送最近12条记录保持记忆
-                }})
-            }});
-            
-            const data = await response.json();
-            
-            // 5. 错误检查
-            if (data.error) {{
-                throw new Error(data.error.message);
-            }}
-            
-            // 6. 获取回复
-            const reply = data.candidates[0].content.parts[0].text;
-            
-            // 7. 记录并展示
-            chatHistory.push({{ "role": "model", "parts": [{{ "text": reply }}] }});
-            
-            btn.className = 'mic-btn';
-            status.innerText = "点击麦克风";
-            addMessage('ai', reply);
-            speak(reply);
-            
-        }} catch (err) {{
-            console.error(err);
-            btn.className = 'mic-btn';
-            status.innerText = "网络错误";
-            addMessage('ai', "哎呀，脑子卡住了！是不是断网了？呱！");
-        }}
-    }}
-
-    function addMessage(role, text) {{
-        const div = document.createElement('div');
-        div.className = 'msg ' + role;
-        div.innerText = text;
-        chatBox.appendChild(div);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }}
-
-    function speak(text) {{
-        avatar.classList.add('shaking');
-        const u = new SpeechSynthesisUtterance(text);
+    # 2. 语音合成 (JS 自动播放 Hack)
+    # 我们生成一段包含 SpeechSynthesis 的 HTML 自动执行
+    js_code = f"""
+    <script>
+        var u = new SpeechSynthesisUtterance("{ai_reply}");
         u.lang = 'zh-CN';
-        u.pitch = 1.6; // 语调高
-        u.rate = 1.3;  // 语速快
-        u.onend = () => {{ avatar.classList.remove('shaking'); }};
-        synth.speak(u);
-    }}
-</script>
-</body>
-</html>
-"""
+        u.rate = 1.4;
+        u.pitch = 1.6;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+    </script>
+    """
+    st.components.v1.html(js_code, height=0, width=0)
+    
+    # 3. 强制刷新界面显示最新文字
+    st.rerun()
 
-# 渲染页面，高度设置大一点以适应聊天框
-components.html(html_code, height=750)
+# --- 6. 语音输入 (如果你的 Streamlit 版本支持) ---
+# 注意：st.audio_input 需要 Streamlit 1.40+ 版本
+try:
+    audio_value = st.audio_input("或者点击麦克风说话 🎤")
+    if audio_value:
+        st.warning("⚠️ 纯语音转文字需要额外的模型(OpenAI/Whisper)，为了不增加你的成本，目前建议使用打字，或者确保你的环境可以调用谷歌语音识别。")
+except AttributeError:
+    pass # 旧版本忽略
+
+# --- 7. 调试帮助 ---
+with st.expander("🛠️ 还是连不上？点这里"):
+    st.write("""
+    **为什么显示网络错误？**
+    因为 Google 的服务在国内被屏蔽了。
+    
+    **怎么解决？**
+    1. **开启 VPN**：确保你的电脑开启了 VPN，并且开启了“全局模式”或者让终端也能通过代理。
+    2. **部署到云端**：把这个代码上传到 Streamlit Cloud (免费)，那边的服务器在美国，可以直接连通，不需要 VPN。
+    """)
